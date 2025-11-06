@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>시스템 리소스 모니터 - 실시간 대시보드</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
+    <script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🖥️ 시스템 리소스 모니터</h1>
+            <div class="header-info">
+                <div class="info-item">
+                    <span class="label">모니터링 시작:</span>
+                    <span id="startTime">{{ start_time }}</span>
+                </div>
+                <div class="info-item">
+                    <span class="label">경과 시간:</span>
+                    <span id="duration">00:00:00</span>
+                </div>
+                <div class="info-item">
+                    <span class="label">남은 시간:</span>
+                    <span id="remaining">05:00</span>
+                </div>
+                <div class="info-item status-indicator">
+                    <span class="label">상태:</span>
+                    <span id="monitorStatus" class="status-badge monitoring">모니터링 중</span>
+                </div>
+            </div>
+        </header>
+
+        <!-- 시스템 정보 -->
+        <section class="system-info">
+            <h2>시스템 정보</h2>
+            <div class="info-grid">
+                <div class="info-card">
+                    <div class="info-label">운영체제</div>
+                    <div class="info-value" id="sysOS">{{ system_info.os }}</div>
+                </div>
+                <div class="info-card">
+                    <div class="info-label">프로세서</div>
+                    <div class="info-value" id="sysProcessor">{{ system_info.processor[:50] }}</div>
+                </div>
+                <div class="info-card">
+                    <div class="info-label">CPU 코어</div>
+                    <div class="info-value" id="sysCPU">{{ system_info.cpu_count }} 코어 / {{ system_info.cpu_threads }} 스레드</div>
+                </div>
+                <div class="info-card">
+                    <div class="info-label">총 메모리</div>
+                    <div class="info-value" id="sysMemory">{{ system_info.total_memory }}</div>
+                </div>
+            </div>
+        </section>
+
+        <!-- 메인 대시보드 -->
+        <div class="dashboard-grid">
+            <!-- CPU -->
+            <div class="card">
+                <div class="card-header">
+                    <h3>CPU 사용률</h3>
+                    <span class="status-badge" id="cpuStatus">정상</span>
+                </div>
+                <div class="metric-display">
+                    <div class="current-value" id="cpuCurrent">0%</div>
+                    <div class="metric-stats">
+                        <span>평균: <span id="cpuAvg">0%</span></span>
+                        <span>최대: <span id="cpuMax">0%</span></span>
+                        <span>온도: <span id="cpuTemp">0°C</span></span>
+                    </div>
+                </div>
+                <div id="cpuChart" class="chart"></div>
+            </div>
+
+            <!-- Memory -->
+            <div class="card">
+                <div class="card-header">
+                    <h3>메모리 사용량</h3>
+                    <span class="status-badge" id="memStatus">정상</span>
+                </div>
+                <div class="metric-display">
+                    <div class="current-value" id="memCurrent">0%</div>
+                    <div class="metric-stats">
+                        <span>사용중: <span id="memUsed">0 GB</span></span>
+                        <span>사용가능: <span id="memAvail">0 GB</span></span>
+                    </div>
+                </div>
+                <div id="memChart" class="chart"></div>
+            </div>
+
+            <!-- GPU -->
+            <div class="card">
+                <div class="card-header">
+                    <h3>GPU 사용률</h3>
+                    <span class="status-badge" id="gpuStatus">정상</span>
+                </div>
+                <div class="metric-display">
+                    <div class="current-value" id="gpuCurrent">N/A</div>
+                    <div class="metric-stats">
+                        <span>온도: <span id="gpuTemp">0°C</span></span>
+                        <span>메모리: <span id="gpuMem">0 MB</span></span>
+                    </div>
+                </div>
+                <div id="gpuChart" class="chart"></div>
+            </div>
+
+            <!-- Disk -->
+            <div class="card">
+                <div class="card-header">
+                    <h3>디스크 사용량</h3>
+                    <span class="status-badge" id="diskStatus">정상</span>
+                </div>
+                <div class="metric-display">
+                    <div class="current-value" id="diskCurrent">0%</div>
+                    <div class="metric-stats">
+                        <span>읽기: <span id="diskRead">0 MB/s</span></span>
+                        <span>쓰기: <span id="diskWrite">0 MB/s</span></span>
+                    </div>
+                </div>
+                <div id="diskChart" class="chart"></div>
+            </div>
+
+            <!-- Network -->
+            <div class="card card-wide">
+                <div class="card-header">
+                    <h3>네트워크 트래픽</h3>
+                    <span class="status-badge normal">정상</span>
+                </div>
+                <div class="metric-row">
+                    <div class="metric-item">
+                        <div class="metric-label">다운로드</div>
+                        <div class="metric-value" id="netDown">0 MB/s</div>
+                    </div>
+                    <div class="metric-item">
+                        <div class="metric-label">업로드</div>
+                        <div class="metric-value" id="netUp">0 MB/s</div>
+                    </div>
+                </div>
+                <div id="netChart" class="chart"></div>
+            </div>
+
+            <!-- Top Processes -->
+            <div class="card card-wide">
+                <div class="card-header">
+                    <h3>상위 프로세스 (CPU 사용률)</h3>
+                </div>
+                <div class="process-table">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>PID</th>
+                                <th>프로세스 이름</th>
+                                <th>CPU %</th>
+                                <th>메모리 %</th>
+                            </tr>
+                        </thead>
+                        <tbody id="processTable">
+                            <tr><td colspan="4">데이터 로딩 중...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <footer>
+            <p id="footerMessage">실시간 모니터링 중... 5분 후 자동으로 PDF 리포트가 생성됩니다.</p>
+        </footer>
+    </div>
+
+    <script src="{{ url_for('static', filename='js/dashboard.js') }}"></script>
+</body>
+</html>
