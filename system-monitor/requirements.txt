@@ -1,0 +1,11 @@
+Flask==3.0.0
+Flask-SocketIO==5.3.6
+psutil==5.9.8
+GPUtil==1.4.0
+plotly==5.18.0
+matplotlib==3.8.2
+reportlab==4.0.9
+python-socketio==5.11.0
+eventlet==0.35.1
+numpy==1.26.3
+Pillow==10.2.0
